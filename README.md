@@ -1,20 +1,6 @@
 # cofiswarm-rag-worker
 
-Cofiswarm component: `rag-worker`.
+RAG background jobs (`jobs.py`) and auto-index queue (`auto_index.py` — no spawn).
 
-- Layout: [REPO-STANDARD-LAYOUT](https://github.com/keepdevops/cofiswarmdev/blob/main/docs/REPO-STANDARD-LAYOUT.md)
-- Migration: [MIGRATION-SPRINTS](https://github.com/keepdevops/cofiswarmdev/blob/main/docs/MIGRATION-SPRINTS.md)
-
-## FHS paths
-
-| Path | Purpose |
-|------|---------|
-| `/etc/cofiswarm/rag-worker/` | config |
-| `/var/lib/cofiswarm/rag-worker/` | state |
-| `/var/log/cofiswarm/rag-worker/` | logs |
-
-## Test
-
-```bash
-./test/scripts/assert-layout.sh rag-worker
-```
+- `scripts/rag-docker-compose.sh` → cofiswarm-launcher compose pgvector
+- Index state: `/var/lib/cofiswarm/rag/index`
