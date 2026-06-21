@@ -6,6 +6,7 @@ import http.server
 import json
 import logging
 import os
+import signal
 import sys
 import threading
 import time
@@ -14,6 +15,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 from cofiswarm_rag_worker.auto_index import index_root  # noqa: E402
+from cofiswarm_rag_worker import observer  # noqa: E402
+
+_stop = threading.Event()
 
 PORT = int(os.environ.get("RAG_WORKER_PORT", "8018"))
 POLL_S = float(os.environ.get("RAG_WORKER_POLL_S", "5"))
@@ -53,14 +57,27 @@ class HealthHandler(http.server.BaseHTTPRequestHandler):
         return
 
 
+def _on_signal(_signum, _frame) -> None:
+    _stop.set()
+
+
 def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
+    signal.signal(signal.SIGTERM, _on_signal)
+    signal.signal(signal.SIGINT, _on_signal)
     server = http.server.ThreadingHTTPServer(("0.0.0.0", PORT), HealthHandler)
     threading.Thread(target=server.serve_forever, daemon=True).start()
     logger.info("rag-worker listening :%s", PORT)
-    while True:
-        drain_once()
-        time.sleep(POLL_S)
+
+    bus = observer.BusPresence()
+    bus.start()  # announce presence on the observer bus (no-op unless COFISWARM_NATS_URL set)
+    try:
+        while not _stop.is_set():
+            drain_once()
+            _stop.wait(POLL_S)  # interruptible sleep so SIGTERM breaks the loop promptly
+    finally:
+        bus.stop()  # goodbye -> offline
+        server.shutdown()
 
 
 if __name__ == "__main__":

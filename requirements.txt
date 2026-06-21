@@ -1,0 +1,5 @@
+# rag-worker runs on the standard library; the only optional deps are the observer bus client,
+# needed solely when COFISWARM_NATS_URL is set (presence reporting to cofiswarm-observer).
+# Local dev: pip install -e ../cofiswarm-observer-sdk/python
+nats-py>=2.6
+cofiswarm-observer-sdk>=1.2.0
