@@ -17,8 +17,12 @@ import (
 	"github.com/keepdevops/cofiswarm-observer-sdk/pkg/buspresence"
 	"github.com/keepdevops/cofiswarm-observer-sdk/pkg/servicecomponent"
 	"github.com/keepdevops/cofiswarm-rag-worker/internal/bus"
+	"github.com/keepdevops/cofiswarm-rag-worker/internal/ingest"
 	"github.com/keepdevops/cofiswarm-rag-worker/internal/queue"
 )
+
+// watchExts are the file types the filesystem auto-indexer picks up.
+var watchExts = []string{".md", ".markdown", ".txt", ".rst"}
 
 func main() {
 	addr := flag.String("listen", envOr("RAG_WORKER_PORT", ":8018"), "health listen address")
@@ -78,11 +82,33 @@ func main() {
 }
 
 func drainLoop(ctx context.Context, poll time.Duration) {
+	// Auto-index: RAG_WATCH_DIR enables a filesystem scan that enqueues changed docs each poll;
+	// RAG_INGEST_URL (default the local rag service) makes the drain actually ingest them.
+	watchDir := os.Getenv("RAG_WATCH_DIR")
+	ragURL := os.Getenv("RAG_INGEST_URL")
+	if ragURL == "" {
+		ragURL = envOr2("COFISWARM_RAG_URL", "http://127.0.0.1:8001")
+	}
+	var process func(string) error
+	if ragURL != "" {
+		process = func(p string) error { return ingest.Post(ragURL, p) }
+	}
+	if watchDir != "" {
+		log.Printf("auto-index: watching %s (exts %v) -> %s", watchDir, watchExts, ragURL)
+	}
+
 	drain := func() {
-		if n, err := queue.DrainOnce(log.Printf); err != nil {
+		if watchDir != "" {
+			if n, err := queue.ScanAndEnqueue(watchDir, watchExts, log.Printf); err != nil {
+				log.Printf("scan failed: %v", err)
+			} else if n > 0 {
+				log.Printf("auto-index: enqueued %d changed file(s)", n)
+			}
+		}
+		if n, err := queue.DrainOnce(process, log.Printf); err != nil {
 			log.Printf("drain failed: %v", err)
 		} else if n > 0 {
-			log.Printf("drained %d job(s)", n)
+			log.Printf("indexed %d file(s)", n)
 		}
 	}
 	drain() // first pass immediately
@@ -115,6 +141,14 @@ func envOr(key, def string) string {
 		}
 	}
 	return v
+}
+
+// envOr2 returns the env value or def verbatim (no port normalization — for URLs/paths).
+func envOr2(key, def string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return def
 }
 
 func pollEnv() time.Duration {

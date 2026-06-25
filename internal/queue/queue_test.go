@@ -23,7 +23,7 @@ func TestEnqueueThenDrain(t *testing.T) {
 	doneFile := filepath.Join(Dir(), "already.json")
 	_ = os.WriteFile(doneFile, []byte(`{"path":"/x","status":"done","note":"keep"}`), 0o644)
 
-	n, err := DrainOnce(func(string, ...any) {})
+	n, err := DrainOnce(nil, func(string, ...any) {})
 	if err != nil {
 		t.Fatalf("drain: %v", err)
 	}
@@ -54,7 +54,7 @@ func TestEnqueueThenDrain(t *testing.T) {
 	}
 
 	// Draining again processes nothing.
-	if n, _ := DrainOnce(func(string, ...any) {}); n != 0 {
+	if n, _ := DrainOnce(nil, func(string, ...any) {}); n != 0 {
 		t.Errorf("second drain processed %d, want 0", n)
 	}
 }
