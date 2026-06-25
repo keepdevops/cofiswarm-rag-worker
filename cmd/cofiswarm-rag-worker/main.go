@@ -14,6 +14,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/keepdevops/cofiswarm-observer-sdk/pkg/buspresence"
 	"github.com/keepdevops/cofiswarm-observer-sdk/pkg/servicecomponent"
 	"github.com/keepdevops/cofiswarm-rag-worker/internal/bus"
 	"github.com/keepdevops/cofiswarm-rag-worker/internal/queue"
@@ -43,6 +44,10 @@ func main() {
 		}
 	}
 
+	// Carrier presence (broker-free, default-off via COFISWARM_BRIDGE_URL): appear in the
+	// observer live roster over the zmq-bridge without needing a NATS broker.
+	stopPresence := buspresence.StartPresence(os.Getenv("COFISWARM_BRIDGE_URL"), "rag-worker", map[string]any{"name": "rag-worker"})
+
 	mux := http.NewServeMux()
 	mux.HandleFunc("/healthz", health)
 	mux.HandleFunc("/health", health)
@@ -64,6 +69,7 @@ func main() {
 	if comp != nil {
 		comp.Shutdown() // goodbye -> offline
 	}
+	stopPresence() // carrier goodbye -> offline
 	shutCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	if err := httpSrv.Shutdown(shutCtx); err != nil {
