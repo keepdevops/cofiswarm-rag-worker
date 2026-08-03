@@ -87,7 +87,7 @@ func drainLoop(ctx context.Context, poll time.Duration) {
 	watchDir := os.Getenv("RAG_WATCH_DIR")
 	ragURL := os.Getenv("RAG_INGEST_URL")
 	if ragURL == "" {
-		ragURL = envOr2("COFISWARM_RAG_URL", "http://127.0.0.1:8001")
+		ragURL = envOr2("COFISWARM_RAG_URL", "http://127.0.0.1:8019")
 	}
 	var process func(string) error
 	if ragURL != "" {
